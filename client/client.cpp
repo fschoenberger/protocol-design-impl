@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
 	options::store(options::parse_command_line(argc, argv, desc), map);
 	options::notify(map);
 
-	if(map.contains("help")) {
+	if(map.count("help")) {
 	    std::cout << desc << "\n";
 		return 1;
 	}
