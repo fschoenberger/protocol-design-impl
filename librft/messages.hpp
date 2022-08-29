@@ -17,13 +17,13 @@ enum class MessageType: U8 {
 #pragma pack(push, 1)
 #endif
 
-struct PACKED BasicMessage {
+struct PACKED MessageBase {
     U16 streamId;
     MessageType messageType;
     U64 sequenceNumber;
 };
 
-struct PACKED ClientHello final : BasicMessage {
+struct PACKED ClientHello final : MessageBase {
     U8 version;
     U8 nextHeaderType;
     U8 nextHeaderOffset;
@@ -32,7 +32,7 @@ struct PACKED ClientHello final : BasicMessage {
     std::string filename;
 };
 
-struct PACKED ServerHello final : BasicMessage {
+struct PACKED ServerHello final : MessageBase {
     U8 version;
     U8 nextHeaderType;
     U8 nextHeaderOffset;
@@ -42,21 +42,21 @@ struct PACKED ServerHello final : BasicMessage {
     U64 fileSizeInBytes;
 };
 
-struct PACKED AckMessage final : BasicMessage {
+struct PACKED AckMessage final : MessageBase {
     U16 windowInMessages;
     U64 ackNumber;
 };
 
-struct PACKED FinMessage final : BasicMessage {
+struct PACKED FinMessage final : MessageBase {
 };
 
-struct PACKED PACKEDErrorMessage final : BasicMessage {
+struct PACKED PACKEDErrorMessage final : MessageBase {
     U8 errorCategory;
     U8 errorCode;
     std::string message;
 };
 
-struct PACKED ChunkMessage final : BasicMessage {
+struct PACKED ChunkMessage final : MessageBase {
     std::array<U8, 8> checksum;
     std::array<U8, 997> payload;
 };
@@ -66,5 +66,5 @@ static_assert(sizeof(ChunkMessage) + 8 == 1024);
 }
 
 #ifdef _MSC_VER
-#pragma pack(pop, 1)
+#pragma pack(pop)
 #endif

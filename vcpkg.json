@@ -3,27 +3,15 @@
   "name": "protocol-design-impl",
   "version-string": "alpha",
   "dependencies": [
-    {
-      "name": "boost-log",
-      "version>=": "1.78.0"
-    },
-    {
-      "name": "boost-unordered",
-      "version>=": "1.78.0"
-    },
-    {
-      "name": "boost-lockfree",
-      "version>=": "1.78.0"
-    },
-    {
-      "name": "boost-program-options",
-      "version>=": "1.78.0"
-    },
-    {
-      "name": "boost-asio",
-      "version>=": "1.78.0"
-    },
-    "ms-gsl"
-  ],
-  "builtin-baseline": "76d4836f3b1e027758044fdbdde91256b0f0955d"
+    "boost-log",
+    "boost-unordered",
+    "boost-lockfree",
+    "boost-msm",
+    "boost-program-options",
+    "boost-circular-buffer",
+    "boost-asio",
+    "boost-pool",
+    "ms-gsl",
+    "hash-library"
+  ]
 }
