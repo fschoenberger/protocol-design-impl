@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
               << "|    |   \\|     \\     |    |\n"
               << "|____|_  /\\___  /     |____|\n"
               << "       \\/     \\/          \n"
-              << "\nRFT reference implementation. \n(c) 2022 Alexander Maslew, Frederic Schoenberger\n\n";
+              << "\nRFT server reference implementation. \n(c) 2022 Alexander Maslew, Frederic Schoenberger\n\n";
 
     ioContext.join();
 

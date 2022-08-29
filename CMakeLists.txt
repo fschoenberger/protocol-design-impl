@@ -11,7 +11,7 @@ project(
 find_package(Boost REQUIRED COMPONENTS program_options log log_setup) 
 find_package(unofficial-hash-library CONFIG REQUIRED)
 
-add_library(rft STATIC librft/pch.hpp librft/messages.hpp librft/exceptions.hpp librft/stream.hpp librft/stream.cpp "librft/logger.cpp" "librft/server.cpp")
+add_library(rft STATIC librft/pch.hpp librft/messages.hpp librft/exceptions.hpp "librft/logger.cpp" "librft/server.cpp" "librft/client.cpp")
 target_precompile_headers(rft PRIVATE librft/pch.hpp)
 target_link_libraries(rft PUBLIC Boost::boost Boost::dynamic_linking Boost::program_options Boost::log Boost::log_setup)
 target_link_libraries(rft PRIVATE unofficial::hash-library)

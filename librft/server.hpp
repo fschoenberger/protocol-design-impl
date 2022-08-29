@@ -13,7 +13,7 @@
 #include <hash-library/sha256.h>
 
 #include "logger.hpp"
-#include "stream.hpp"
+#include "messages.hpp"
 #include "congestion_control.hpp"
 
 namespace rft {
