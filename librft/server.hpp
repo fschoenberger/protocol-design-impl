@@ -66,7 +66,7 @@ public:
     }
 
     boost::asio::awaitable<void> SendServerHello() {
-        SHA256 sha256stream;
+        SHA256 sha256Stream;
         auto sizeRead = 0;
 
         // We have a connection timeout here, if our file is large enough, because it just takes too long to read it from HDD
@@ -74,15 +74,15 @@ public:
         auto buffer = new char[BUFFER_SIZE];
         while(sizeRead < file_.size()) {
             auto actualRead = co_await file_.async_read_some_at(sizeRead, boost::asio::buffer(buffer, BUFFER_SIZE), boost::asio::use_awaitable);
-            sha256stream.add(buffer, actualRead);
+            sha256Stream.add(buffer, actualRead);
             sizeRead += actualRead;
         }
         delete[] buffer;
 
         unsigned char hash[32];
-        sha256stream.getHash(hash);
+        sha256Stream.getHash(hash);
 
-        LOG_INFO("Hash of file is {}.", sha256stream.getHash());
+        LOG_INFO("Hash of file is {}.", sha256Stream.getHash());
 
         auto* serverHello = new ServerHello{
             id_,
@@ -155,12 +155,6 @@ private:
     const decltype(MessageBase::streamId) id_;
     boost::asio::random_access_file file_;
     boost::asio::any_io_executor executor_;
-
-    //CongestionControl::input_channel& inputChannel_;
-    //CongestionControl::output_channel& outputChannel_;
-
-    std::uint16_t clientWindowInMessages_;
-    std::uint16_t sendWindow_ = 1;
 };
 
 } // namespace rft
