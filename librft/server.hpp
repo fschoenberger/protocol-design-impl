@@ -56,9 +56,13 @@ public:
         const ClientHello* const message)
         : CongestionControlMixin(inputChannel, outputChannel),
           id_(streamId),
-          file_(executor, "C:\\source\\blog\\src\\images\\technology.jpg", boost::asio::file_base::read_only),
+          file_(executor),
           executor_(executor) {
-        LOG_INFO("New stream {} established.", streamId);
+
+        //This might be a bug,when the string is not 0-terminated? Maybe?
+        std::string filename{message->fileName};
+        file_.open(filename, boost::asio::file_base::read_only);
+        LOG_INFO("New stream {} for file {} established.", streamId, filename);
     }
 
     ~ServerStream() {

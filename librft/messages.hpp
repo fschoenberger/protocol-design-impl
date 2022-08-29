@@ -23,14 +23,16 @@ struct PACKED MessageBase {
     U64 sequenceNumber;
 };
 
+constexpr static size_t MAX_FILENAME_SIZE = 1024 - 8 /* UDP Frame*/ - 1 - 1 - 1 - 2 - 4 - sizeof(MessageBase);
 struct PACKED ClientHello final : MessageBase {
     U8 version;
     U8 nextHeaderType;
     U8 nextHeaderOffset;
     U16 windowInMessages;
     U32 startChunk;
-    std::string filename;
+    char fileName[MAX_FILENAME_SIZE];
 };
+static_assert(sizeof(ClientHello) + 8 == 1024);
 
 struct PACKED ServerHello final : MessageBase {
     U8 version;
