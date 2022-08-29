@@ -10,6 +10,8 @@
 #include <chrono>
 #include <tuple>
 
+#include <hash-library/sha256.h>
+
 #include "logger.hpp"
 #include "stream.hpp"
 #include "congestion_control.hpp"
@@ -54,7 +56,7 @@ public:
         const ClientHello* const message)
         : CongestionControlMixin(inputChannel, outputChannel),
           id_(streamId),
-          file_(executor, "C:\\source\\boost-pool\\index.html", boost::asio::file_base::read_only),
+          file_(executor, "C:\\source\\blog\\src\\images\\technology.jpg", boost::asio::file_base::read_only),
           executor_(executor) {
         LOG_INFO("New stream {} established.", streamId);
     }
@@ -64,9 +66,25 @@ public:
     }
 
     boost::asio::awaitable<void> SendServerHello() {
-        //TODO: Calculate hash sum
+        SHA256 sha256stream;
+        auto sizeRead = 0;
 
-        std::unique_ptr<char[]> message{reinterpret_cast<char*>(new ServerHello{
+        // We have a connection timeout here, if our file is large enough, because it just takes too long to read it from HDD
+        constexpr auto BUFFER_SIZE = 10 * 1024 * 1024;
+        auto buffer = new char[BUFFER_SIZE];
+        while(sizeRead < file_.size()) {
+            auto actualRead = co_await file_.async_read_some_at(sizeRead, boost::asio::buffer(buffer, BUFFER_SIZE), boost::asio::use_awaitable);
+            sha256stream.add(buffer, actualRead);
+            sizeRead += actualRead;
+        }
+        delete[] buffer;
+
+        unsigned char hash[32];
+        sha256stream.getHash(hash);
+
+        LOG_INFO("Hash of file is {}.", sha256stream.getHash());
+
+        auto* serverHello = new ServerHello{
             id_,
             MessageType::kServerHello,
             0,
@@ -77,7 +95,10 @@ public:
             {0},
             0,
             file_.size()
-        })};
+        };
+        std::ranges::copy_n(reinterpret_cast<uint64_t*>(hash), 4, serverHello->checksum.begin());
+
+        std::unique_ptr<char[]> message{reinterpret_cast<char*>(serverHello)};
 
         co_await Send(std::move(message));
     }
