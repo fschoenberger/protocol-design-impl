@@ -10,7 +10,7 @@
 #include <chrono>
 #include <tuple>
 
-#include <hash-library/sha256.h>
+#include <hash-library/sha3.h>
 
 #include "logger.hpp"
 #include "messages.hpp"
@@ -70,7 +70,7 @@ public:
     }
 
     boost::asio::awaitable<void> SendServerHello() {
-        SHA256 sha256Stream;
+        SHA3 sha3;
         auto sizeRead = 0;
 
         // We have a connection timeout here, if our file is large enough, because it just takes too long to read it from HDD
@@ -78,15 +78,15 @@ public:
         auto buffer = new char[BUFFER_SIZE];
         while(sizeRead < file_.size()) {
             auto actualRead = co_await file_.async_read_some_at(sizeRead, boost::asio::buffer(buffer, BUFFER_SIZE), boost::asio::use_awaitable);
-            sha256Stream.add(buffer, actualRead);
+            sha3.add(buffer, actualRead);
             sizeRead += actualRead;
         }
         delete[] buffer;
 
         unsigned char hash[32];
-        sha256Stream.getHash(hash);
+        //TODO: Fill hash buffer :c
 
-        LOG_INFO("Hash of file is {}.", sha256Stream.getHash());
+        LOG_INFO("Hash of file is {}.", sha3.getHash());
 
         auto* serverHello = new ServerHello{
             id_,
@@ -114,7 +114,7 @@ public:
         try {
             co_await SendServerHello();
 
-            {
+            if(false) {
                 // Await first client ack
                 boost::asio::steady_timer t(executor_, 5s);
                 const auto result = co_await (t.async_wait(boost::asio::use_awaitable) || Receive());
@@ -125,18 +125,30 @@ public:
                 }
             }
 
-            auto firstChunk = 3;
-            auto lastChunk = 12;
-            constexpr auto CHUNK_SIZE = 1024;
+            constexpr auto CHUNK_SIZE = sizeof(ChunkMessage::payload);
 
-            for (int i = firstChunk; i < lastChunk; ++i) {
-                std::array<char, CHUNK_SIZE> data{0};
+            auto firstChunk = 0; //TODO
+            auto lastChunk = static_cast<size_t>(std::ceil(file_.size() / CHUNK_SIZE));
 
-                // TODO: Check if function supports EOF
-                // auto bytesRead = co_await async_read_at(file_, i * CHUNK_SIZE, boost::asio::buffer(data), boost::asio::use_awaitable);
+            for (int i = firstChunk; i <= lastChunk; ++i) {
+                std::unique_ptr<char[]> buffer(new char[sizeof(ChunkMessage)]);
+                auto* message = new(buffer.get()) ChunkMessage{
+                    0,
+                    MessageType::kChunk,
+                    0,
+                    {0},
+                    {0}
+                };
 
-                co_await Send(nullptr);
+                const size_t payloadSize = (i != lastChunk) ? CHUNK_SIZE : file_.size() % CHUNK_SIZE; //TODO: The last expression can be 0, which is incorrect
+                auto bytesRead = co_await async_read_at(file_, i * CHUNK_SIZE, boost::asio::buffer(message->payload, payloadSize), boost::asio::use_awaitable);
+
+                LOG_TRACE("Stream {}: Sending chunk {}.", id_, i);
+                co_await Send(std::move(buffer));
             }
+
+            boost::asio::steady_timer t(executor_, 5s);
+            co_await t.async_wait(boost::asio::use_awaitable);
 
             {
                 // Fin Message

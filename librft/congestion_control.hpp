@@ -8,7 +8,7 @@ namespace rft {
 
 namespace CongestionControl {
 
-using input_channel = boost::asio::experimental::channel<void(boost::system::error_code, void*)>;
+using input_channel = boost::asio::experimental::channel<void(boost::system::error_code, std::unique_ptr<char[]>)>;
 using output_channel = boost::asio::experimental::channel<void(boost::system::error_code, std::unique_ptr<char[]>)>;
 
 }
@@ -33,17 +33,11 @@ public:
     }
 
     boost::asio::awaitable<void> Send(std::unique_ptr<char[]> message) {
-        LOG_INFO("Hello from send!");
-
         co_await output_.async_send(boost::system::error_code(), std::move(message), boost::asio::use_awaitable);
-
-        co_return;
     }
 
     boost::asio::awaitable<std::unique_ptr<char[]>> Receive() {
-        co_await input_.async_receive(boost::asio::use_awaitable);
-
-        co_return nullptr;
+        co_return std::move(co_await input_.async_receive(boost::asio::use_awaitable));
     }
 
 private:

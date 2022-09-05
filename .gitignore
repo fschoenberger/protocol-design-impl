@@ -33,3 +33,5 @@
 
 out/
 .vs/
+/Folder.DotSettings.user
+/CMakeSettings.json

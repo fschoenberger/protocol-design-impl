@@ -4,9 +4,6 @@
 #include <boost/program_options.hpp>
 
 #include <boost/asio.hpp>
-#include <boost/array.hpp>
-#include <boost/bind.hpp>
-#include <thread>
 
 #include "../librft/client.hpp"
 #include "../librft/logger.hpp"
@@ -16,40 +13,36 @@ namespace options = boost::program_options;
 using boost::asio::ip::udp;
 using boost::asio::ip::address;
 
-#define IPADDRESS "127.0.0.1"
-#define UDP_PORT 10251
-
-
 int main(int argc, char** argv) {
-	options::options_description desc("Allowed options");
-	desc.add_options()
-		("help", "Print help message")
-		("version", "Print version");
+    options::options_description desc("Allowed options");
+    desc.add_options()
+        ("help", "Print help message")
+        ("version", "Print version");
 
-	options::variables_map map;
-	options::store(options::parse_command_line(argc, argv, desc), map);
-	options::notify(map);
+    options::variables_map map;
+    options::store(options::parse_command_line(argc, argv, desc), map);
+    options::notify(map);
 
-	if(map.count("help") > 0) {
-	    std::cout << desc << "\n";
-		return 1;
-	}
-
-    LOG_INFO("Starting client!");
+    if (map.count("help") > 0) {
+        std::cout << desc << "\n";
+        return 1;
+    }
 
     boost::asio::thread_pool ioContext;
     rft::Client s(ioContext.get_executor());
-    boost::asio::co_spawn(ioContext, s.Run(), boost::asio::detached);
 
     std::cout << "________________________________\n"
-              << "\\______   \\_   _____/\\__    ___/\n"
-              << "|       _/|    __)    |    |\n"
-              << "|    |   \\|     \\     |    |\n"
-              << "|____|_  /\\___  /     |____|\n"
-              << "       \\/     \\/          \n"
-              << "\nRFT client reference implementation. \n(c) 2022 Alexander Maslew, Frederic Schoenberger\n\n";
+        << "\\______   \\_   _____/\\__    ___/\n"
+        << "|       _/|    __)    |    |\n"
+        << "|    |   \\|     \\     |    |\n"
+        << "|____|_  /\\___  /     |____|\n"
+        << "       \\/     \\/          \n"
+        << "\nRFT client reference implementation. \n(c) 2022 Alexander Maslew, Frederic Schoenberger\n\n";
 
+    LOG_INFO("Starting client!");
+
+    boost::asio::co_spawn(ioContext, s.Run(), boost::asio::detached);
     ioContext.join();
 
-	LOG_INFO("Goodbye from client.");
+    LOG_INFO("Goodbye from client.");
 }

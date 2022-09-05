@@ -52,7 +52,7 @@ struct PACKED AckMessage final : MessageBase {
 struct PACKED FinMessage final : MessageBase {
 };
 
-struct PACKED PACKEDErrorMessage final : MessageBase {
+struct PACKED ErrorMessage final : MessageBase {
     U8 errorCategory;
     U8 errorCode;
     std::string message;

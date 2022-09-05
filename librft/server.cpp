@@ -78,20 +78,44 @@ boost::asio::awaitable<void> Server::Run() {
                 boost::asio::co_spawn(executor_, [id, &outputChannel, this, destination = endpoint]() -> boost::asio::awaitable<void> {
                     while (outputChannel.is_open()) {
                         try {
-                            constexpr auto SIZE = sizeof(ServerHello);
+                            //constexpr auto SIZE = sizeof(ServerHello);
 
                             const auto message = co_await outputChannel.async_receive(boost::asio::use_awaitable);
 
-                            LOG_TRACE("Stream {}: Sending {} bytes to {}.", id, SIZE, destination.address().to_string());
-                            const auto size = co_await socket_.async_send_to(boost::asio::buffer(message.get(), SIZE), destination, boost::asio::use_awaitable);
+                            const auto* base = reinterpret_cast<MessageBase*>(message.get());
+                            auto size = 0;
+                            switch (base->messageType) {
+                                case MessageType::kClientHello:
+                                    size = sizeof(ClientHello);
+                                    break;
+                                case MessageType::kServerHello:
+                                    size = sizeof(ServerHello);
+                                    break;
+                                case MessageType::kAck:
+                                    size = sizeof(AckMessage);
+                                    break;
+                                case MessageType::kFin:
+                                    size = sizeof(FinMessage);
+                                    break;
+                                case MessageType::kError:
+                                    size = sizeof(ErrorMessage);
+                                    break;
+                                case MessageType::kChunk:
+                                    size = sizeof(ChunkMessage);
+                                    break;
+                            }
+
+                            assert(size != 0);
+
+                            const auto actualSize = co_await socket_.async_send_to(boost::asio::buffer(message.get(), size), destination, boost::asio::use_awaitable);
                             LOG_TRACE("Stream {}: Sent {} bytes to {}.", id, size, destination.address().to_string());
 
-                            if (size != SIZE) {
-                                LOG_ERROR("In stream {} a fewer bytes than the message size were sent out. Expected size: {}, actual size: {}.", id, SIZE, size);
+                            if (actualSize != size) {
+                                LOG_ERROR("In stream {} a fewer bytes than the message size were sent out. Expected size: {}, actual size: {}.", id, size, actualSize);
                                 co_return;
                             }
                         } catch (const boost::system::system_error& e) {
-                            if(e.code() == boost::asio::experimental::error::channel_closed) {
+                            if (e.code() == boost::asio::experimental::error::channel_closed) {
                                 LOG_INFO("co_awaited a closed channel, cleaning up...");
                             } else {
                                 LOG_ERROR("Connection {} encountered an error while trying to send using the output channel: {}", id, e.what());
