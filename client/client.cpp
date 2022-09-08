@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
 #include <iostream>
+#include <string>
 #include <boost/program_options.hpp>
 
 #include <boost/asio.hpp>
@@ -39,9 +40,14 @@ int main(int argc, char** argv) {
         << "       \\/     \\/          \n"
         << "\nRFT client reference implementation. \n(c) 2022 Alexander Maslew, Frederic Schoenberger\n\n";
 
+
+    std::cout << "Downloaded files will be saved to your Desktop\n"
+        << "Please enter fileName to download:";
+    std::string fileName;
+    std::getline(std::cin, fileName);
     LOG_INFO("Starting client!");
 
-    boost::asio::co_spawn(ioContext, s.Run(), boost::asio::detached);
+    boost::asio::co_spawn(ioContext, s.Run(fileName), boost::asio::detached);
     ioContext.join();
 
     LOG_INFO("Goodbye from client.");

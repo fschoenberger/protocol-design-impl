@@ -2,10 +2,12 @@
 
 #include <boost/program_options.hpp>
 #include <iostream>
-
+#include <filesystem>
 #include "pch.hpp"
 
 namespace options = boost::program_options;
+
+std::vector<std::string> files; // currently available files
 
 int main(int argc, char** argv) {
     options::options_description desc("Allowed options");
@@ -31,6 +33,21 @@ int main(int argc, char** argv) {
               << "|____|_  /\\___  /     |____|\n"
               << "       \\/     \\/          \n"
               << "\nRFT server reference implementation. \n(c) 2022 Alexander Maslew, Frederic Schoenberger\n\n";
+
+
+    std::string path = getenv("USERPROFILE");
+    path += "\\RFT";
+    //auto dirIter = std::filesystem::directory_iterator(path);
+    int fileCount = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(path)) fileCount++;
+
+    if (fileCount == 0) std::cout << "Please put files into the " << path << " folder!\n";
+
+    std::cout << "Currently serving the following " << fileCount << " files:\n";
+    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        std::cout << entry.path() << std::endl;
+        files.push_back(entry.path().string());
+    }
 
     ioContext.join();
 

@@ -4,6 +4,7 @@
 #include <boost/asio/experimental/channel.hpp>
 #include <boost/asio/experimental/awaitable_operators.hpp>
 #include <boost/circular_buffer.hpp>
+#include <boost/algorithm/string.hpp>
 #include <chrono>
 #include <tuple>
 
@@ -26,7 +27,7 @@ class Client {
 public:
     explicit Client(boost::asio::any_io_executor executor);
 
-    boost::asio::awaitable<void> Run();
+    boost::asio::awaitable<void> Run(std::string filePath);
 
 private:
     //TODO: This should be moved out of class scope!
@@ -55,10 +56,10 @@ public:
         LOG_INFO("Cleaned up stream {}.", id_);
     }
 
-    boost::asio::awaitable<void> SendClientHello() {
+    boost::asio::awaitable<void> SendClientHello(std::string fileName) {
         LOG_INFO("Sending client hello...");
-
-        auto* clientHello = new ClientHello{0, MessageType::kClientHello, 0, 0x1, 0, 0, 10, 0, {"C:\\source\\blog\\src\\images\\technology.jpg"}};
+        auto* clientHello = new ClientHello{0, MessageType::kClientHello, 0, 0x1, 0, 0, 10, 0, ""};
+        strcpy(clientHello->fileName, &fileName[0]);
         std::unique_ptr<char[]> message{reinterpret_cast<char*>(clientHello)};
         co_await Send(std::move(message));
     }
@@ -91,12 +92,15 @@ public:
         co_return serverHello->fileSizeInBytes;
     }
 
-    boost::asio::awaitable<void> Run() {
+    boost::asio::awaitable<void> Run(std::string fileName) {
         try {
-            co_await SendClientHello();
+            co_await SendClientHello(fileName);
             auto fileSize = co_await ExpectServerHello();
 
-            boost::asio::basic_stream_file<> file(executor_, "C:\\Users\\frede\\Desktop\\test.jpg",
+            std::string savePath = getenv("USERPROFILE");
+            savePath += "\\Desktop\\";
+            savePath += fileName;
+            boost::asio::basic_stream_file<> file(executor_, &savePath[0],
                                                   boost::asio::file_base::create | boost::asio::file_base::write_only | boost::asio::file_base::truncate);
 
             constexpr auto MAX_PAYLOAD_SIZE = sizeof(ChunkMessage::payload);

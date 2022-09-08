@@ -11,7 +11,7 @@ Client::Client(boost::asio::any_io_executor executor)
 
 }
 
-boost::asio::awaitable<void> Client::Run() {
+boost::asio::awaitable<void> Client::Run(std::string fileName) {
     using namespace boost::asio::experimental::awaitable_operators;
 
     CongestionControl::input_channel inputChannel(executor_);
@@ -71,7 +71,7 @@ boost::asio::awaitable<void> Client::Run() {
     };
 
     // If one of the coroutines end, the others are cancelled as well
-    co_await (receiver() || sender() || clientStream.Run());
+    co_await (receiver() || sender() || clientStream.Run(fileName));
 
     LOG_INFO("Exiting Client::Run()");
     co_return;

@@ -61,7 +61,10 @@ public:
 
         //This might be a bug,when the string is not 0-terminated? Maybe?
         std::string filename{message->fileName};
-        file_.open(filename, boost::asio::file_base::read_only);
+        std::string filePath = getenv("USERPROFILE");
+        filePath += "\\RFT\\";
+        filePath += filename;
+        file_.open(filePath, boost::asio::file_base::read_only);
         LOG_INFO("New stream {} for file {} established.", streamId, filename);
     }
 
