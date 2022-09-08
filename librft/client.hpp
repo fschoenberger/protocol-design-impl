@@ -69,7 +69,7 @@ public:
 
         boost::asio::steady_timer t(executor_);
         t.expires_after(5s);
-        const auto result = co_await (Receive() || t.async_wait(boost::asio::use_awaitable));
+        const auto result = co_await (TryGetMessage() || t.async_wait(boost::asio::use_awaitable));
 
         if (result.index() == 1) {
             LOG_INFO("5 seconds expired and we got no ServerHello. Destroying stream.");
@@ -106,7 +106,7 @@ public:
             LOG_INFO("Filesize is {}. That makes {} chunks. The last chunk has {} bytes.", fileSize, numChunks, fileSize % MAX_PAYLOAD_SIZE);
 
             for (int i = 0; i < numChunks; ++i) {
-                auto messageBuffer = co_await Receive();
+                auto messageBuffer = co_await TryGetMessage();
                 auto* message = reinterpret_cast<MessageBase*>(messageBuffer.get());
 
                 //TODO: Check if message is chunk
@@ -134,7 +134,7 @@ public:
 
 private:
     using CongestionControlMixin::Send;
-    using CongestionControlMixin::Receive;
+    using CongestionControlMixin::TryGetMessage;
 
     //static constexpr const size_t MAX_BUFFER_SIZE = 15;
 

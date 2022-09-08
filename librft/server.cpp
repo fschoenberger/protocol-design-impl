@@ -133,6 +133,7 @@ boost::asio::awaitable<void> Server::Run() {
             } else {
                 // We already have a stream
                 const auto streamId = message->streamId;
+
                 if (!streams_.contains(streamId)) {
                     LOG_WARNING("Received message for stream {} from {}, however no stream with such an ID was found. Discarding the message.", streamId,
                                 endpoint.address().to_string());
@@ -140,8 +141,8 @@ boost::asio::awaitable<void> Server::Run() {
                 }
 
                 auto& stream = streams_.at(streamId);
-
-                //stream.PushMessage(std::span{data, bytesReceived});
+                
+                stream.PushMessage(data.get());
             }
         }
     } catch (const std::exception& e) {

@@ -107,6 +107,11 @@ public:
         co_await Send(std::move(message));
     }
 
+    bool PushMessage(char* data) {
+        std::unique_ptr<char[]> message{reinterpret_cast<char*>(data)};
+        return PushMessage(std::move(message));
+    }
+
     boost::asio::awaitable<void> Run() {
         using namespace std::chrono_literals;
         using namespace boost::asio::experimental::awaitable_operators;
@@ -117,7 +122,7 @@ public:
             if(false) {
                 // Await first client ack
                 boost::asio::steady_timer t(executor_, 5s);
-                const auto result = co_await (t.async_wait(boost::asio::use_awaitable) || Receive());
+                const auto result = co_await (t.async_wait(boost::asio::use_awaitable) || TryGetMessage());
 
                 if (result.index() == 0) {
                     LOG_INFO("5 seconds expired and we got no client ACK. Destroying connection.");
@@ -164,7 +169,8 @@ public:
 
 private:
     using CongestionControlMixin::Send;
-    using CongestionControlMixin::Receive;
+    using CongestionControlMixin::TryGetMessage;
+    using CongestionControlMixin::PushMessage;
 
     static constexpr const size_t MAX_BUFFER_SIZE = 15;
 
