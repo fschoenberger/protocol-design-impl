@@ -34,9 +34,6 @@ private:
 
     boost::asio::ip::udp::socket socket_;
     boost::asio::any_io_executor executor_;
-
-    std::map<decltype(MessageBase::streamId), ClientStream<RenolikeCongestionControl>> streams_{};
-    std::map<decltype(MessageBase::streamId), std::tuple<CongestionControl::input_channel, CongestionControl::output_channel>> channels_{};
 };
 
 
@@ -45,9 +42,8 @@ class ClientStream : private CongestionControlMixin {
 public:
     ClientStream(
         boost::asio::any_io_executor executor,
-        CongestionControl::input_channel& inputChannel,
         CongestionControl::output_channel& outputChannel)
-        : CongestionControlMixin(inputChannel, outputChannel),
+        : CongestionControlMixin(outputChannel),
           executor_(executor) {
     }
 
@@ -58,9 +54,21 @@ public:
     boost::asio::awaitable<void> SendClientHello() {
         LOG_INFO("Sending client hello...");
 
-        auto* clientHello = new ClientHello{0, MessageType::kClientHello, 0, 0x1, 0, 0, 10, 0, {"C:\\source\\blog\\src\\images\\technology.jpg"}};
-        std::unique_ptr<char[]> message{reinterpret_cast<char*>(clientHello)};
-        co_await Send(std::move(message));
+        std::vector<char> buffer(sizeof(ClientHello));
+
+        new(buffer.data()) ClientHello{
+            0,
+            MessageType::kClientHello,
+            0,
+            0x1,
+            0,
+            0,
+            10,
+            0,
+            {"C:\\source\\blog\\src\\images\\technology.jpg"}
+        };
+
+        co_await Send(std::move(buffer));
     }
 
     boost::asio::awaitable<size_t> ExpectServerHello() {
@@ -76,18 +84,19 @@ public:
             throw std::runtime_error{"5 seconds expired and we got no ServerHello. Destroying stream."};
         }
 
-        if (const auto* message = reinterpret_cast<MessageBase*>(std::get<0>(result).get()); message->messageType != MessageType::kServerHello) {
+        if (const auto* message = reinterpret_cast<const MessageBase*>(std::get<0>(result).data()); message->messageType != MessageType::kServerHello) {
             LOG_ERROR("Got an unexpected message or an error. Terminating stream.");
             throw std::runtime_error{"Got an unexpected message or an error. Terminating stream."};
         }
 
-        const auto* serverHello = reinterpret_cast<ServerHello*>(std::get<0>(result).get());
+        const auto* serverHello = reinterpret_cast<const ServerHello*>(std::get<0>(result).data());
         if (serverHello->nextHeaderOffset != 0 || serverHello->nextHeaderType != 0) {
             LOG_ERROR("Server is trying to use the nextHeader feature.");
             throw std::runtime_error{"Server is trying to use the nextHeader feature."};
         }
 
         id_ = serverHello->streamId;
+        CongestionControlMixin::SetStreamId(id_);
         co_return serverHello->fileSizeInBytes;
     }
 
@@ -107,7 +116,7 @@ public:
 
             for (int i = 0; i < numChunks; ++i) {
                 auto messageBuffer = co_await Receive();
-                auto* message = reinterpret_cast<MessageBase*>(messageBuffer.get());
+                auto* message = reinterpret_cast<MessageBase*>(messageBuffer.data());
 
                 //TODO: Check if message is chunk
                 auto* chunk = reinterpret_cast<ChunkMessage*>(message);
@@ -131,6 +140,8 @@ public:
         LOG_INFO("Stream is finished.");
         co_return;
     }
+
+    using CongestionControlMixin::PushMessage;
 
 private:
     using CongestionControlMixin::Send;

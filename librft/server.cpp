@@ -20,18 +20,20 @@ Server::Server(boost::asio::any_io_executor executor, short serverPort)
 boost::asio::awaitable<void> Server::Run() {
     try {
         //TODO: We might want to use something like a pool allocator here instead of allocating it on the heap, but ¯\_(ツ)_/¯.
-        std::unique_ptr<char[]> data{new char[MAX_LENGTH]};
+        //std::unique_ptr<char[]> data{new char[MAX_LENGTH]};
+        std::vector<char> data(MAX_LENGTH);
 
         ip::udp::endpoint endpoint;
         for (;;) {
             // We can't receive half a UDP datagram, so at this point we know we received a complete message
-            const size_t bytesReceived = co_await socket_.async_receive_from(boost::asio::buffer(data.get(), MAX_LENGTH), endpoint, boost::asio::use_awaitable);
+            const size_t bytesReceived = co_await socket_.async_receive_from(boost::asio::buffer(data), endpoint, boost::asio::use_awaitable);
             if (bytesReceived < sizeof(MessageBase)) {
                 LOG_WARNING("Received malformed message or incomplete message with size {} from {}", bytesReceived, endpoint.address().to_string());
                 continue;
             }
+            data.resize(bytesReceived);
 
-            const auto* const message = reinterpret_cast<MessageBase*>(data.get());
+            const auto* const message = reinterpret_cast<MessageBase*>(data.data());
 
             if (message->messageType == MessageType::kClientHello) {
                 // At this point, we're establishing a new stream
@@ -48,15 +50,15 @@ boost::asio::awaitable<void> Server::Run() {
                     id = distribution(random);
                 } while (streams_.contains(id));
 
-                auto [channelsIterator, channelSuccess] = channels_.try_emplace(id, executor_, executor_);
+                auto [channelsIterator, channelSuccess] = channels_.try_emplace(id, executor_);
                 if (!channelSuccess) {
                     LOG_WARNING("Could not emplace stream channels {}. Skipping.", id);
                     continue;
                 }
 
-                auto& [inputChannel, outputChannel] = channelsIterator->second;
+                auto& outputChannel = channelsIterator->second;
 
-                auto [stream, streamSuccess] = streams_.try_emplace(id, executor_, inputChannel, outputChannel, id, reinterpret_cast<const ClientHello*>(message));
+                auto [stream, streamSuccess] = streams_.try_emplace(id, executor_, outputChannel, id, reinterpret_cast<const ClientHello*>(message));
                 if (!streamSuccess) {
                     LOG_WARNING("Could not emplace stream {}. Skipping.", id);
                     continue;
@@ -82,7 +84,7 @@ boost::asio::awaitable<void> Server::Run() {
 
                             const auto message = co_await outputChannel.async_receive(boost::asio::use_awaitable);
 
-                            const auto* base = reinterpret_cast<MessageBase*>(message.get());
+                            const auto* base = reinterpret_cast<const MessageBase*>(message.data());
                             auto size = 0;
                             switch (base->messageType) {
                                 case MessageType::kClientHello:
@@ -107,7 +109,7 @@ boost::asio::awaitable<void> Server::Run() {
 
                             assert(size != 0);
 
-                            const auto actualSize = co_await socket_.async_send_to(boost::asio::buffer(message.get(), size), destination, boost::asio::use_awaitable);
+                            const auto actualSize = co_await socket_.async_send_to(boost::asio::buffer(message.data(), size), destination, boost::asio::use_awaitable);
                             LOG_TRACE("Stream {}: Sent {} bytes to {}.", id, size, destination.address().to_string());
 
                             if (actualSize != size) {
@@ -141,7 +143,7 @@ boost::asio::awaitable<void> Server::Run() {
 
                 auto& stream = streams_.at(streamId);
 
-                //stream.PushMessage(std::span{data, bytesReceived});
+                stream.PushMessage(std::move(data));
             }
         }
     } catch (const std::exception& e) {
