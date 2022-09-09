@@ -152,6 +152,9 @@ public:
 
                 LOG_TRACE("Stream {}: Sending chunk {}.", id_, i);
                 co_await Send(std::move(buffer));
+
+                //Hotfix: Make up for lack of congestion control
+                std::this_thread::sleep_for(100ms);
             }
 
             boost::asio::steady_timer t(executor_, 5s);
