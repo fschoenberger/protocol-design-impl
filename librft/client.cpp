@@ -14,38 +14,33 @@ Client::Client(boost::asio::any_io_executor executor)
 boost::asio::awaitable<void> Client::Run(std::string fileName) {
     using namespace boost::asio::experimental::awaitable_operators;
 
-    CongestionControl::input_channel inputChannel(executor_);
     CongestionControl::output_channel outputChannel(executor_);
 
-    ClientStream<RenolikeCongestionControl> clientStream(executor_, inputChannel, outputChannel);
+    ClientStream<RenolikeCongestionControl> clientStream(executor_,  outputChannel);
 
     auto sender = [&outputChannel, this]() -> boost::asio::awaitable<void> {
-        auto id = -1;
-
         while (outputChannel.is_open()) {
             try {
-                constexpr auto SIZE = sizeof(ClientHello);
-
                 const auto message = co_await outputChannel.async_receive(boost::asio::use_awaitable);
 
-                const auto size = co_await socket_.async_send_to(boost::asio::buffer(message.get(), SIZE), ip::udp::endpoint(ip::address::from_string("127.0.0.2"), 5051),
+                const auto size = co_await socket_.async_send_to(boost::asio::buffer(message), ip::udp::endpoint(ip::address::from_string("127.0.0.2"), 5051),
                                                                  boost::asio::use_awaitable);
-                LOG_TRACE("Stream {}: Sent {} bytes.", id, size);
+                LOG_TRACE("Sent {} bytes.", size);
 
-                if (size != SIZE) {
-                    LOG_ERROR("In stream {} a fewer bytes than the message size were sent out. Expected size: {}, actual size: {}.", id, SIZE, size);
+                if (size != message.size()) {
+                    LOG_ERROR("Fewer bytes than the message size were sent out. Expected size: {}, actual size: {}.", message.size(), size);
                     co_return;
                 }
             } catch (const boost::system::system_error& e) {
                 if (e.code() == boost::asio::experimental::error::channel_closed) {
                     LOG_INFO("co_awaited a closed channel, cleaning up...");
                 } else {
-                    LOG_ERROR("Stream {} encountered an error while trying to send using the output channel: {}", id, e.what());
+                    LOG_ERROR("We encountered an error while trying to send using the output channel: {}", e.what());
                 }
 
                 break;
             } catch (const std::exception& e) {
-                LOG_ERROR("Stream {} encountered an error while trying to send using the output channel: {}", id, e.what());
+                LOG_ERROR("We encountered an error while trying to send using the output channel: {}", e.what());
                 break;
             }
         }
@@ -53,17 +48,19 @@ boost::asio::awaitable<void> Client::Run(std::string fileName) {
         co_return;
     };
 
-    auto receiver = [&inputChannel, this]() -> boost::asio::awaitable<void> {
+    auto receiver = [&clientStream, this]() -> boost::asio::awaitable<void> {
         try {
-            while (inputChannel.is_open()) {
-                std::unique_ptr<char[]> data(new char[MAX_LENGTH]);
+            for(;;) {
+                std::vector<char> data(MAX_LENGTH);
 
                 ip::udp::endpoint endpoint;
 
-                auto size = co_await socket_.async_receive_from(boost::asio::buffer(data.get(), MAX_LENGTH), endpoint, boost::asio::use_awaitable);
-                LOG_TRACE("Received {} bytes from {}.", size, endpoint.address().to_string());
+                auto size = co_await socket_.async_receive_from(boost::asio::buffer(data), endpoint, boost::asio::use_awaitable);
+                data.resize(size);
 
-                co_await inputChannel.async_send(boost::system::error_code(), std::move(data), boost::asio::use_awaitable);
+                LOG_TRACE("Received {} ({}) bytes from {}.", size, data.size(), endpoint.address().to_string());
+
+                clientStream.PushMessage(std::move(data));
             }
         } catch (const std::exception& e) {
             LOG_ERROR("Receiving failed because {}.", e.what());

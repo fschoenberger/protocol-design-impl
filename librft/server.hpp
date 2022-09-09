@@ -38,7 +38,7 @@ private:
     boost::asio::any_io_executor executor_;
 
     std::map<decltype(MessageBase::streamId), ServerStream<RenolikeCongestionControl>> streams_{};
-    std::map<decltype(MessageBase::streamId), std::tuple<CongestionControl::input_channel, CongestionControl::output_channel>> channels_{};
+    std::map<decltype(MessageBase::streamId), CongestionControl::output_channel> channels_{};
 
     static std::random_device random;
     static std::uniform_int<std::uint16_t> distribution;
@@ -50,16 +50,16 @@ class ServerStream : private CongestionControlMixin {
 public:
     ServerStream(
         boost::asio::any_io_executor executor,
-        CongestionControl::input_channel& inputChannel,
         CongestionControl::output_channel& outputChannel,
         U16 streamId,
         const ClientHello* const message)
-        : CongestionControlMixin(inputChannel, outputChannel),
+        : CongestionControlMixin(outputChannel),
           id_(streamId),
           file_(executor),
           executor_(executor) {
 
         //This might be a bug,when the string is not 0-terminated? Maybe?
+        CongestionControlMixin::SetStreamId(streamId);
         std::string filename{message->fileName};
         std::string filePath = getenv("USERPROFILE");
         filePath += "\\RFT\\";
@@ -91,7 +91,8 @@ public:
 
         LOG_INFO("Hash of file is {}.", sha3.getHash());
 
-        auto* serverHello = new ServerHello{
+        std::vector<char> buffer2(sizeof(ServerHello));
+        auto* serverHello = new (buffer2.data()) ServerHello{
             id_,
             MessageType::kServerHello,
             0,
@@ -105,9 +106,7 @@ public:
         };
         std::ranges::copy_n(reinterpret_cast<uint64_t*>(hash), 4, serverHello->checksum.begin());
 
-        std::unique_ptr<char[]> message{reinterpret_cast<char*>(serverHello)};
-
-        co_await Send(std::move(message));
+        co_await Send(std::move(buffer2));
     }
 
     bool PushMessage(char* data) {
@@ -125,7 +124,7 @@ public:
             if(false) {
                 // Await first client ack
                 boost::asio::steady_timer t(executor_, 5s);
-                const auto result = co_await (t.async_wait(boost::asio::use_awaitable) || TryGetMessage());
+                const auto result = co_await (t.async_wait(boost::asio::use_awaitable) || Receive());
 
                 if (result.index() == 0) {
                     LOG_INFO("5 seconds expired and we got no client ACK. Destroying connection.");
@@ -139,8 +138,8 @@ public:
             auto lastChunk = static_cast<size_t>(std::ceil(file_.size() / CHUNK_SIZE));
 
             for (int i = firstChunk; i <= lastChunk; ++i) {
-                std::unique_ptr<char[]> buffer(new char[sizeof(ChunkMessage)]);
-                auto* message = new(buffer.get()) ChunkMessage{
+                std::vector<char> buffer(sizeof(ChunkMessage));
+                auto* message = new(buffer.data()) ChunkMessage{
                     0,
                     MessageType::kChunk,
                     0,
@@ -170,10 +169,11 @@ public:
         co_return;
     }
 
+    using CongestionControlMixin::PushMessage;
+
 private:
     using CongestionControlMixin::Send;
-    using CongestionControlMixin::TryGetMessage;
-    using CongestionControlMixin::PushMessage;
+    using CongestionControlMixin::Receive;
 
     static constexpr const size_t MAX_BUFFER_SIZE = 15;
 
